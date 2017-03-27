@@ -1,0 +1,52 @@
+<beans xmlns="http://www.springframework.org/schema/beans" 
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xmlns:rabbit="http://www.springframework.org/schema/rabbit"
+       xsi:schemaLocation="http://www.springframework.org/schema/beans
+	   http://www.springframework.org/schema/beans/spring-beans.xsd 
+	   http://www.springframework.org/schema/rabbit 
+	   http://www.springframework.org/schema/rabbit/spring-rabbit.xsd">
+
+
+    <!-- 
+        交换机配置 
+    -->
+    <rabbit:topic-exchange name="${rabbit.recharge.exchange.name}" auto-declare="true">
+        <rabbit:bindings>
+            <rabbit:binding queue="${rabbit.recharge.queue.name}" pattern="${rabbit.recharge.queue.pattern}"/>
+        </rabbit:bindings>
+    </rabbit:topic-exchange>
+    
+    <!--   
+        队列配置 
+        durable : 持久化
+    -->
+    <rabbit:queue name="${rabbit.recharge.queue.name}" durable="true"/>
+
+    <!-- 
+        acknowledge : 通知方式,默认auto(自动)
+        prefetch : 指定一个请求能处理多少个消息，如果有事务的话，必须大于等于transaction数量.
+        transaction-size : 指定一个事务处理的消息数量，最好是小于等于prefetch的数量.
+        concurrency : 指定最小的消费者数量.
+        max-concurrency : 指定最大的消费者数量.
+        更多看 org.springframework.amqp.rabbit.listener.SimpleMessageListenerContainer 源码
+        在这里基本是使用默认的
+    -->
+    <rabbit:listener-container connection-factory="connectionFactory"
+                               acknowledge="auto"
+                               advice-chain="retryOperationsInterceptor"
+    >
+        <rabbit:listener ref="rechargeOrderListener" method="onMessage" queue-names="${rabbit.recharge.queue.name}"/>
+    </rabbit:listener-container>
+
+
+</beans>
+
+
+
+
+
+
+
+
+
+

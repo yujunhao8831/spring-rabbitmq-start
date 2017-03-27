@@ -1,0 +1,105 @@
+<beans xmlns="http://www.springframework.org/schema/beans" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xmlns:rabbit="http://www.springframework.org/schema/rabbit"
+       xmlns:task="http://www.springframework.org/schema/task"
+       xsi:schemaLocation="http://www.springframework.org/schema/beans
+	   http://www.springframework.org/schema/beans/spring-beans.xsd 
+	   http://www.springframework.org/schema/rabbit 
+	   http://www.springframework.org/schema/rabbit/spring-rabbit.xsd 
+	   http://www.springframework.org/schema/task 
+	   http://www.springframework.org/schema/task/spring-task.xsd">
+
+    <!-- 
+        异步的线程池，线程池的最在数不能设定太小，不然<rabbit:listener/>/@RabbitListener太多的话，会出现发无法正常消费问题 
+    -->
+    <task:executor id="amqpConnectionTaskExecutor" pool-size="${rabbit.pool.size}"/>
+
+
+    <!-- rabbit 连接工厂-->
+    <rabbit:connection-factory
+            id="connectionFactory"
+            addresses="${rabbit.addresses}"
+            virtual-host="${rabbit.virtual.host}"
+            username="${rabbit.username}"
+            password="${rabbit.password}"
+            thread-factory="threadFactory"
+            channel-cache-size="60"
+            executor="amqpConnectionTaskExecutor"
+    />
+    <!-- 定义线程的名字 -->
+    <bean id="threadFactory" class="org.springframework.scheduling.concurrent.CustomizableThreadFactory">
+        <constructor-arg value="rabbitmq-"/>
+    </bean>
+
+    <!-- MQ 管理, 队列 交换机 -->
+    <rabbit:admin connection-factory="connectionFactory" id="rabbitAdmin"/>
+
+
+    <!-- 定义template start -->
+    <!-- 
+        定义template,这里不指定交换机和队列,在队列中进行指定
+    -->
+    <rabbit:template id="amqpTemplate"
+                     connection-factory="connectionFactory"
+                     retry-template="retryTemplate"
+    />
+
+    <!-- 定义template end -->
+
+
+    <!-- 让步策略 start  -->
+    <bean id="fixedBackOff" class="org.springframework.util.backoff.FixedBackOff">
+        <description>1. 让步策略,这个是固定的策略,比如最大次数3次,固定3秒每次.</description>
+        <property name="maxAttempts" value="3"/>
+        <property name="interval" value="3000"/>
+    </bean>
+
+    <bean id="exponentialBackOffPolicy" class="org.springframework.retry.backoff.ExponentialBackOffPolicy">
+        <description>2. 让步策略,这个是按指数逐步增长.</description>
+        <!-- 初始区间 -->
+        <property name="initialInterval" value="500"/>
+        <!-- 倍数 -->
+        <property name="multiplier" value="10.0"/>
+        <!-- 最大间隔 -->
+        <property name="maxInterval" value="10000"/>
+    </bean>
+    <!-- 让步策略 end  -->
+
+    <!-- 重试策略 -->
+    <bean id="simpleRetryPolicy" class="org.springframework.retry.policy.SimpleRetryPolicy">
+        <!-- 最大次数 -->
+        <property name="maxAttempts" value="3"/>
+    </bean>
+
+    <!-- 添加重试功能 -->
+    <bean id="retryTemplate" class="org.springframework.retry.support.RetryTemplate">
+        <!-- 让步策略 -->
+        <property name="backOffPolicy" ref="exponentialBackOffPolicy"/>
+        <!-- 重试策略 -->
+        <property name="retryPolicy" ref="simpleRetryPolicy"/>
+    </bean>
+
+
+    <!-- 拒接消息策略 -->
+    <bean id="rejectAndLogRecoverer" class="com.aidijing.utils.RejectAndLogRecoverer"/>
+
+    <bean id="retryOperationsInterceptor" class="org.springframework.amqp.rabbit.config.StatelessRetryOperationsInterceptorFactoryBean">
+        <!-- 重试操作配置,这里异常情况下会按照retryTemplate进行重试 -->
+        <property name="retryOperations" ref="retryTemplate"/>
+        <!-- 如果超过重试次数后会进行消息回收 -->
+        <property name="messageRecoverer" ref="rejectAndLogRecoverer"/>
+    </bean>
+
+    <!-- 充值队列 -->
+    <import resource="rabbitmq/applicationContext-rabbitmq-recharge.xml"/>
+
+</beans>
+
+
+
+
+
+
+
+
+
+

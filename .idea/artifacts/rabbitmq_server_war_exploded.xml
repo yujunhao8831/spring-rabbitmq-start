@@ -1,0 +1,16 @@
+<component name="ArtifactManager">
+  <artifact type="exploded-war" name="rabbitmq-server:war exploded">
+    <output-path>$PROJECT_DIR$/rabbitmq-server/target/rabbitmq-server</output-path>
+    <root id="root">
+      <element id="directory" name="WEB-INF">
+        <element id="directory" name="classes">
+          <element id="module-output" name="rabbitmq-server" />
+        </element>
+      </element>
+      <element id="directory" name="META-INF">
+        <element id="file-copy" path="$PROJECT_DIR$/rabbitmq-server/target/rabbitmq-server/META-INF/MANIFEST.MF" />
+      </element>
+      <element id="javaee-facet-resources" facet="rabbitmq-server/web/Web" />
+    </root>
+  </artifact>
+</component>
